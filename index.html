@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>元素之心（完整版）</title>
+<style>
+body { margin:0; overflow:hidden; font-family:sans-serif; }
+
+#panel {
+ position:fixed;
+ top:10px;
+ left:10px;
+ background:rgba(0,0,0,0.6);
+ color:white;
+ padding:10px;
+ border-radius:10px;
+}
+
+#ui {
+ position:fixed;
+ right:20px;
+ bottom:20px;
+}
+
+button {
+ width:70px;
+ height:70px;
+ margin:5px;
+ font-size:20px;
+}
+</style>
+</head>
+<body>
+
+<div id="panel">
+HP: <span id="hp">100</span><br>
+金幣: <span id="gold">0</span><br>
+等級: <span id="level">1</span>
+</div>
+
+<div id="ui">
+<button onclick="attack()">⚔️</button>
+<button onclick="talk()">💬</button>
+<button onclick="openShop()">💎</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+
+<script>
+// ===== 基本場景 =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// 光
+const light = new THREE.DirectionalLight(0xffffff,1);
+light.position.set(5,10,5);
+scene.add(light);
+
+// 地面
+const ground = new THREE.Mesh(
+ new THREE.PlaneGeometry(100,100),
+ new THREE.MeshStandardMaterial({color:0x228B22})
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+// ===== 玩家 =====
+const player = new THREE.Mesh(
+ new THREE.BoxGeometry(1,1,1),
+ new THREE.MeshStandardMaterial({color:0x0000ff})
+);
+player.position.y = 0.5;
+scene.add(player);
+
+// ===== 敵人 =====
+let enemy = new THREE.Mesh(
+ new THREE.BoxGeometry(1,1,1),
+ new THREE.MeshStandardMaterial({color:0xff0000})
+);
+enemy.position.set(5,0.5,5);
+scene.add(enemy);
+
+let enemyHP = 50;
+
+// ===== NPC =====
+const npc = new THREE.Mesh(
+ new THREE.BoxGeometry(1,2,1),
+ new THREE.MeshStandardMaterial({color:0xffff00})
+);
+npc.position.set(-5,1,-5);
+scene.add(npc);
+
+// ===== 玩家數值 =====
+let hp = 100;
+let gold = 0;
+let level = 1;
+let atk = 10;
+
+// ===== 控制 =====
+let keys = {};
+document.addEventListener("keydown", e=>keys[e.key]=true);
+document.addEventListener("keyup", e=>keys[e.key]=false);
+
+// ===== 移動 =====
+function move(){
+ let speed = 0.1;
+ if(keys["w"]) player.position.z -= speed;
+ if(keys["s"]) player.position.z += speed;
+ if(keys["a"]) player.position.x -= speed;
+ if(keys["d"]) player.position.x += speed;
+}
+
+// ===== 攝影機 =====
+function cam(){
+ camera.position.set(player.position.x,5,player.position.z+6);
+ camera.lookAt(player.position);
+}
+
+// ===== 攻擊 =====
+function attack(){
+ if(!enemy) return;
+
+ let dist = player.position.distanceTo(enemy.position);
+ if(dist < 2){
+   enemyHP -= atk;
+   log("攻擊成功 -" + atk);
+
+   if(enemyHP <= 0){
+     log("擊敗敵人！");
+     gold += 20;
+     gainExp();
+     scene.remove(enemy);
+     enemy = null;
+   }
+ }
+}
+
+// ===== NPC對話 =====
+function talk(){
+ let dist = player.position.distanceTo(npc.position);
+ if(dist < 3){
+   alert("勇者！去打怪賺錢吧！");
+ }
+}
+
+// ===== 商店（賺錢系統）=====
+function openShop(){
+ let choice = prompt("商店：1.升級攻擊(50金) 2.回血(30金)");
+
+ if(choice == "1" && gold >= 50){
+   gold -= 50;
+   atk += 5;
+   log("攻擊提升！");
+ }
+
+ if(choice == "2" && gold >= 30){
+   gold -= 30;
+   hp += 30;
+   log("回血成功！");
+ }
+}
+
+// ===== 升級 =====
+function gainExp(){
+ level++;
+ document.getElementById("level").innerText = level;
+}
+
+// ===== 敵人AI =====
+function enemyAI(){
+ if(!enemy) return;
+
+ let dir = player.position.clone().sub(enemy.position).normalize();
+ enemy.position.add(dir.multiplyScalar(0.02));
+
+ let dist = player.position.distanceTo(enemy.position);
+ if(dist < 1.5){
+   hp -= 1;
+ }
+}
+
+// ===== UI更新 =====
+function updateUI(){
+ document.getElementById("hp").innerText = Math.floor(hp);
+ document.getElementById("gold").innerText = gold;
+}
+
+// ===== 訊息 =====
+function log(msg){
+ console.log(msg);
+}
+
+// ===== 遊戲循環 =====
+function loop(){
+ requestAnimationFrame(loop);
+
+ move();
+ cam();
+ enemyAI();
+ updateUI();
+
+ renderer.render(scene, camera);
+}
+
+loop();
+
+// 視窗調整
+window.addEventListener("resize", ()=>{
+ renderer.setSize(innerWidth, innerHeight);
+ camera.aspect = innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+});
+</script>
+
+</body>
+</html>
