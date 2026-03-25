@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>元素之心（完整版）</title>
+<title>元素之心（修正版）</title>
 <style>
 body { margin:0; overflow:hidden; font-family:sans-serif; }
 
@@ -28,6 +28,26 @@ button {
  margin:5px;
  font-size:20px;
 }
+
+#joystick {
+ position:fixed;
+ left:20px;
+ bottom:20px;
+ width:120px;
+ height:120px;
+ background:rgba(255,255,255,0.2);
+ border-radius:50%;
+}
+
+#stick {
+ width:50px;
+ height:50px;
+ background:white;
+ border-radius:50%;
+ position:absolute;
+ left:35px;
+ top:35px;
+}
 </style>
 </head>
 <body>
@@ -40,14 +60,17 @@ HP: <span id="hp">100</span><br>
 
 <div id="ui">
 <button onclick="attack()">⚔️</button>
-<button onclick="talk()">💬</button>
 <button onclick="openShop()">💎</button>
+</div>
+
+<div id="joystick">
+<div id="stick"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
 <script>
-// ===== 基本場景 =====
+// ===== 場景 =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
@@ -69,7 +92,7 @@ const ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// ===== 玩家 =====
+// 玩家
 const player = new THREE.Mesh(
  new THREE.BoxGeometry(1,1,1),
  new THREE.MeshStandardMaterial({color:0x0000ff})
@@ -77,7 +100,7 @@ const player = new THREE.Mesh(
 player.position.y = 0.5;
 scene.add(player);
 
-// ===== 敵人 =====
+// 敵人
 let enemy = new THREE.Mesh(
  new THREE.BoxGeometry(1,1,1),
  new THREE.MeshStandardMaterial({color:0xff0000})
@@ -87,32 +110,50 @@ scene.add(enemy);
 
 let enemyHP = 50;
 
-// ===== NPC =====
-const npc = new THREE.Mesh(
- new THREE.BoxGeometry(1,2,1),
- new THREE.MeshStandardMaterial({color:0xffff00})
-);
-npc.position.set(-5,1,-5);
-scene.add(npc);
-
 // ===== 玩家數值 =====
 let hp = 100;
 let gold = 0;
 let level = 1;
 let atk = 10;
 
-// ===== 控制 =====
-let keys = {};
-document.addEventListener("keydown", e=>keys[e.key]=true);
-document.addEventListener("keyup", e=>keys[e.key]=false);
+// ===== 搖桿控制 =====
+let joystick = {x:0, y:0};
+let dragging = false;
+
+const stick = document.getElementById("stick");
+const joystickDiv = document.getElementById("joystick");
+
+joystickDiv.addEventListener("touchstart", ()=> dragging=true);
+joystickDiv.addEventListener("touchend", ()=>{
+ dragging=false;
+ joystick.x = 0;
+ joystick.y = 0;
+ stick.style.left="35px";
+ stick.style.top="35px";
+});
+
+joystickDiv.addEventListener("touchmove", e=>{
+ let rect = joystickDiv.getBoundingClientRect();
+ let x = e.touches[0].clientX - rect.left - 60;
+ let y = e.touches[0].clientY - rect.top - 60;
+
+ let dist = Math.sqrt(x*x+y*y);
+ if(dist>40){
+   x*=40/dist;
+   y*=40/dist;
+ }
+
+ joystick.x = x/40;
+ joystick.y = y/40;
+
+ stick.style.left = (x+60-25)+"px";
+ stick.style.top = (y+60-25)+"px";
+});
 
 // ===== 移動 =====
 function move(){
- let speed = 0.1;
- if(keys["w"]) player.position.z -= speed;
- if(keys["s"]) player.position.z += speed;
- if(keys["a"]) player.position.x -= speed;
- if(keys["d"]) player.position.x += speed;
+ player.position.x += joystick.x * 0.2;
+ player.position.z += joystick.y * 0.2;
 }
 
 // ===== 攝影機 =====
@@ -128,74 +169,55 @@ function attack(){
  let dist = player.position.distanceTo(enemy.position);
  if(dist < 2){
    enemyHP -= atk;
-   log("攻擊成功 -" + atk);
 
    if(enemyHP <= 0){
-     log("擊敗敵人！");
      gold += 20;
-     gainExp();
+     level++;
      scene.remove(enemy);
      enemy = null;
    }
  }
 }
 
-// ===== NPC對話 =====
-function talk(){
- let dist = player.position.distanceTo(npc.position);
- if(dist < 3){
-   alert("勇者！去打怪賺錢吧！");
- }
-}
-
-// ===== 商店（賺錢系統）=====
+// ===== 商店 =====
 function openShop(){
- let choice = prompt("商店：1.升級攻擊(50金) 2.回血(30金)");
-
- if(choice == "1" && gold >= 50){
+ if(gold >= 50){
    gold -= 50;
    atk += 5;
-   log("攻擊提升！");
- }
-
- if(choice == "2" && gold >= 30){
-   gold -= 30;
-   hp += 30;
-   log("回血成功！");
+   alert("攻擊升級！");
+ }else{
+   alert("金幣不夠！");
  }
 }
 
-// ===== 升級 =====
-function gainExp(){
- level++;
- document.getElementById("level").innerText = level;
-}
-
-// ===== 敵人AI =====
+// ===== AI =====
 function enemyAI(){
  if(!enemy) return;
 
  let dir = player.position.clone().sub(enemy.position).normalize();
- enemy.position.add(dir.multiplyScalar(0.02));
+ enemy.position.add(dir.multiplyScalar(0.03));
 
  let dist = player.position.distanceTo(enemy.position);
  if(dist < 1.5){
-   hp -= 1;
+   hp -= 0.5;
  }
 }
 
-// ===== UI更新 =====
+// ===== UI =====
 function updateUI(){
+ if(hp < 0) hp = 0;
+
  document.getElementById("hp").innerText = Math.floor(hp);
  document.getElementById("gold").innerText = gold;
+ document.getElementById("level").innerText = level;
+
+ if(hp <= 0){
+   alert("你死了！");
+   location.reload();
+ }
 }
 
-// ===== 訊息 =====
-function log(msg){
- console.log(msg);
-}
-
-// ===== 遊戲循環 =====
+// ===== Loop =====
 function loop(){
  requestAnimationFrame(loop);
 
@@ -206,7 +228,6 @@ function loop(){
 
  renderer.render(scene, camera);
 }
-
 loop();
 
 // 視窗調整
